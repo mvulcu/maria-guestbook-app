@@ -22,6 +22,7 @@ type Entry struct {
 	ID        int       `json:"id"`
 	Name      string    `json:"name"`
 	Message   string    `json:"message"`
+	Level     string    `json:"level"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -321,7 +322,7 @@ func (app *App) getEntriesHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Hämta från databas
 	rows, err := app.DB.Query(`
-		SELECT id, name, message, created_at
+		SELECT id, name, message, level, created_at
 		FROM entries
 		ORDER BY created_at DESC
 		LIMIT 100
@@ -335,7 +336,7 @@ func (app *App) getEntriesHandler(w http.ResponseWriter, r *http.Request) {
 	entries := []Entry{}
 	for rows.Next() {
 		var e Entry
-		if err := rows.Scan(&e.ID, &e.Name, &e.Message, &e.CreatedAt); err != nil {
+		if err := rows.Scan(&e.ID, &e.Name, &e.Message, &e.Level, &e.CreatedAt); err != nil {
 			continue
 		}
 		entries = append(entries, e)
@@ -374,10 +375,10 @@ func (app *App) createEntryHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Spara i databas
 	err := app.DB.QueryRow(`
-		INSERT INTO entries (name, message)
-		VALUES ($1, $2)
+		INSERT INTO entries (name, message, level)
+		VALUES ($1, $2, $3)
 		RETURNING id, created_at
-	`, entry.Name, entry.Message).Scan(&entry.ID, &entry.CreatedAt)
+	`, entry.Name, entry.Message, entry.Level).Scan(&entry.ID, &entry.CreatedAt)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

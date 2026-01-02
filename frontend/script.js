@@ -4,9 +4,9 @@ const nameInput = document.getElementById('name');
 const messageInput = document.getElementById('message');
 const entriesList = document.getElementById('entriesList');
 
-// New UI Elements for v4.0
+// New UI Elements for v4.1
 const grepInput = document.getElementById('grepInput');
-const panicBtn = document.getElementById('panicBtn');
+const mainPanicBtn = document.getElementById('mainPanicBtn'); // The new big button
 const stampMenu = document.getElementById('stampMenu');
 const matrixCanvas = document.getElementById('matrixCanvas');
 
@@ -36,9 +36,9 @@ const editCancelBtn = document.getElementById('editCancelBtn');
 // State management
 let currentEntryId = null;
 let currentSound = null;
-let userCounts = {}; // Caching user message counts for Rank calculation
-let activeStampId = null; // Which entry is currently opening the stamp menu
-let defconActive = false; // Panic mode state
+let userCounts = {};
+let activeStampId = null;
+let defconActive = false;
 
 // --- UTILS & HELPERS ---
 
@@ -49,8 +49,6 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Markdown Parser for Syntax Highlighting
-// Replaces `code` with styled spans
 function parseMarkdown(text) {
     const escaped = escapeHtml(text);
     return escaped.replace(/`([^`]+)`/g, '<span class="code-block">$1</span>');
@@ -94,7 +92,7 @@ function showFeedbackIcon(type) {
     setTimeout(() => { feedbackIcon.classList.remove('show'); }, 2000);
 }
 
-// --- MODAL LOGIC (Standard) ---
+// --- MODAL LOGIC ---
 function showModal(message) {
     if (!modalOverlay || !modalText) return;
     modalText.textContent = message;
@@ -113,9 +111,9 @@ if (editCancelBtn) editCancelBtn.addEventListener('click', hideEditModal);
 if (deleteModal) deleteModal.addEventListener('click', (e) => { if (e.target === deleteModal) hideDeleteModal(); });
 if (editModal) editModal.addEventListener('click', (e) => { if (e.target === editModal) hideEditModal(); });
 
-// --- GAME & OPS FEATURES ---
+// --- FEATURES & COMMANDS ---
 
-// 1. Matrix Rain Effect (Canvas)
+// Matrix Canvas
 let matrixInterval;
 function toggleMatrix() {
     const ctx = matrixCanvas.getContext('2d');
@@ -149,7 +147,7 @@ function toggleMatrix() {
     }
 }
 
-// 2. Defcon Mode (Panic)
+// Defcon Mode
 function toggleDefcon() {
     defconActive = !defconActive;
     const body = document.body;
@@ -169,42 +167,36 @@ function toggleDefcon() {
         }
     }
 }
-// Secret click handler on red traffic light
-if (panicBtn) panicBtn.addEventListener('dblclick', toggleDefcon);
+if (mainPanicBtn) mainPanicBtn.addEventListener('click', toggleDefcon);
 
-// 3. Rank Calculator
-// Counts occurrences of user in the current dataset to assign a badge
+// Clickable Hints
+document.querySelectorAll('.command-hints .cmd').forEach(cmd => {
+    cmd.addEventListener('click', () => {
+        messageInput.value = cmd.textContent;
+        messageInput.focus();
+    });
+});
+
+// Rank Calculation - LOWER THRESHOLDS for testing
 function calculateRank(username) {
     const count = userCounts[username] || 0;
-    if (count > 50) return '<span class="rank-badge rank-high">CYBER-GOD</span>';
-    if (count > 10) return '<span class="rank-badge rank-mid">SR. ADMIN</span>';
+    if (count > 5) return '<span class="rank-badge rank-high">CYBER-GOD</span>';
+    if (count > 2) return '<span class="rank-badge rank-mid">SR. ADMIN</span>';
     return '<span class="rank-badge">JR. NODE</span>';
 }
 
-// 4. Slash Command Parser
 function processSlashCommand(cmd) {
     const command = cmd.trim().toLowerCase();
-
     switch (command) {
-        case '/clear':
-            entriesList.innerHTML = '';
-            showModal('Terminal Buffer Cleared locally.');
-            return true;
-        case '/matrix':
-            toggleMatrix();
-            return true;
-        case '/weather':
-            showModal('Server Room Temp: 18°C. Humidity: 40%. Status: OPTIMAL.');
-            return true;
-        case '/panic':
-            toggleDefcon();
-            return true;
-        default:
-            return false;
+        case '/clear': entriesList.innerHTML = ''; showModal('Terminal Buffer Cleared.'); return true;
+        case '/matrix': toggleMatrix(); return true;
+        case '/weather': showModal('Server Room Temp: 18°C. Humidity: 40%. Status: OPTIMAL.'); return true;
+        case '/panic': toggleDefcon(); return true;
+        default: return false;
     }
 }
 
-// --- CORE RENDER LOGIC ---
+// --- RENDER LOGIC ---
 
 function createEntryHTML(entry) {
     const opacityStyle = entry.isTemp ? 'style="opacity: 0.6; filter: grayscale(0.5);"' : '';
@@ -212,17 +204,13 @@ function createEntryHTML(entry) {
     const dateStr = date.toLocaleDateString('en-US');
     const timeStr = date.toLocaleTimeString('en-US');
 
-    // Default to INFO if level missing (backward compatibility)
+    // Default level to INFO if missing from backend
     const level = entry.level || 'INFO';
     const severityClass = `lvl-${level}`;
 
-    // Parse message for Markdown
     const formattedMessage = parseMarkdown(entry.message);
-
-    // Calculate Rank based on local stats
     const rankBadge = calculateRank(entry.name);
 
-    // Render Stamps if they exist
     let stampsHTML = '';
     if (entry.stamps && Array.isArray(entry.stamps)) {
         entry.stamps.forEach(stamp => {
@@ -262,8 +250,6 @@ function renderSingleEntry(entry, prepend = true) {
 async function loadEntries() {
     try {
         const response = await fetch('/api/entries', { cache: 'no-store' });
-
-        // Cache Header logic
         const cacheHeader = response.headers.get('X-Cache');
         if (cacheStatusEl) {
             if (cacheHeader === 'HIT') {
@@ -278,13 +264,9 @@ async function loadEntries() {
 
         const entries = await response.json();
 
-        // Count users for Ranks
         userCounts = {};
-        entries.forEach(e => {
-            userCounts[e.name] = (userCounts[e.name] || 0) + 1;
-        });
+        entries.forEach(e => { userCounts[e.name] = (userCounts[e.name] || 0) + 1; });
 
-        // Filter Logic (Grep)
         const filterVal = grepInput.value.toLowerCase();
         const filteredEntries = entries.filter(e =>
             e.name.toLowerCase().includes(filterVal) ||
@@ -304,7 +286,6 @@ async function loadEntries() {
         }
 
         const htmlString = filteredEntries.map(entry => createEntryHTML(entry)).join('');
-
         if (entriesList.innerHTML !== htmlString) {
             entriesList.innerHTML = htmlString;
         }
@@ -314,14 +295,13 @@ async function loadEntries() {
     }
 }
 
-// --- API OPERATIONS ---
-// Now including 'level' and 'stamps' support
+// --- API OPS ---
 
 async function createEntry(name, message, level) {
     const response = await fetch('/api/entries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, message, level }) // Passing severity level
+        body: JSON.stringify({ name, message, level })
     });
     if (!response.ok) throw new Error('API Error');
 }
@@ -335,19 +315,15 @@ async function updateEntry(id, name, message) {
     if (!response.ok) throw new Error('API Error');
 }
 
-// Simulating Stamp API call - In real scenario this would be a specific endpoint
 async function addStamp(id, stampType) {
-    // For now, we just log it as we can't change the API structure in this environment
     console.log(`[API MOCK] Adding stamp ${stampType} to entry ${id}`);
-
-    // Optimistic UI update for stamps (Visual only since we can't save to DB)
     const entryDiv = document.querySelector(`.entry[data-id="${id}"]`);
     if (entryDiv) {
         const stampHTML = `<div class="stamp-mark" style="transform: translate(50%, -50%) rotate(${Math.random() * 20 - 10}deg)">${stampType}</div>`;
         entryDiv.insertAdjacentHTML('afterbegin', stampHTML);
-        // Play thump sound
-        const audio = new Audio('https://freesound.org/data/previews/163/163454_2309489-lq.mp3'); // Fallback sound or use existing
-        playSound('success');
+        // Play stamp sound from Google assets since we don't have custom one
+        const audio = new Audio('https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg');
+        audio.play().catch(e => { });
     }
 }
 
@@ -356,12 +332,9 @@ async function deleteEntry(id) {
     if (!response.ok && response.status !== 204) throw new Error('API Error');
 }
 
-// --- EVENT HANDLERS ---
+// --- HANDLERS ---
 
-// Real-time Grep (Filter)
-if (grepInput) {
-    grepInput.addEventListener('input', () => loadEntries());
-}
+if (grepInput) grepInput.addEventListener('input', () => loadEntries());
 
 if (deleteConfirmBtn) {
     deleteConfirmBtn.addEventListener('click', async () => {
@@ -401,15 +374,12 @@ if (editForm) {
     });
 }
 
-// Submission Handler with Slash Command Interception
 if (entryForm) {
     entryForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-
         const name = nameInput.value.trim();
         const message = messageInput.value.trim();
 
-        // Grab selected severity
         const levelSelector = document.querySelector('input[name="level"]:checked');
         const level = levelSelector ? levelSelector.value : 'INFO';
 
@@ -418,37 +388,30 @@ if (entryForm) {
             return;
         }
 
-        // Check for Slash Command
         if (message.startsWith('/')) {
             const isCommand = processSlashCommand(message);
             if (isCommand) {
                 messageInput.value = '';
-                return; // Stop here, don't send to DB
+                return;
             }
         }
 
         const fakeId = 'temp-' + Date.now();
         const tempEntry = {
-            id: fakeId,
-            name: name,
-            message: message,
+            id: fakeId, name: name, message: message,
             created_at: new Date().toISOString(),
-            level: level, // Pass level to temp renderer
-            isTemp: true
+            level: level, isTemp: true
         };
 
         renderSingleEntry(tempEntry, true);
         entryForm.reset();
-
-        // Reset radio to INFO
         document.getElementById('lvl-info').checked = true;
-
         showFeedbackIcon('success');
         playSound('success');
 
         try {
             await createEntry(name, message, level);
-            await loadEntries(); // Refresh to get ranks
+            await loadEntries();
             loadStats();
         } catch (error) {
             document.querySelector(`[data-id="${fakeId}"]`)?.remove();
@@ -458,7 +421,6 @@ if (entryForm) {
     });
 }
 
-// Global click handler for Stamps and Modals
 if (entriesList) {
     entriesList.addEventListener('click', async (e) => {
         const btn = e.target.closest('button');
@@ -470,22 +432,20 @@ if (entriesList) {
         } else if (btn.classList.contains('edit-btn')) {
             const entryEl = btn.closest('.entry');
             const nameEl = entryEl.querySelector('.entry-name');
-            // Remove rank text from name for editing
-            const cleanName = nameEl.childNodes[0].textContent;
+            // Extract clean name without badge
+            const cleanName = nameEl.childNodes[0].textContent.trim();
             const msgEl = entryEl.querySelector('.entry-message');
             showEditModal(id, cleanName, msgEl.textContent);
         } else if (btn.classList.contains('stamp-btn')) {
-            // Show Stamp Menu at cursor position
             activeStampId = id;
             stampMenu.style.top = `${e.pageY}px`;
             stampMenu.style.left = `${e.pageX}px`;
             stampMenu.classList.add('show');
-            e.stopPropagation(); // Prevent document click from closing immediately
+            e.stopPropagation();
         }
     });
 }
 
-// Handle Stamp Selection
 if (stampMenu) {
     stampMenu.addEventListener('click', (e) => {
         if (e.target.classList.contains('stamp-option')) {
@@ -497,12 +457,8 @@ if (stampMenu) {
     });
 }
 
-// Close stamp menu on outside click
-document.addEventListener('click', () => {
-    if (stampMenu) stampMenu.classList.remove('show');
-});
+document.addEventListener('click', () => { if (stampMenu) stampMenu.classList.remove('show'); });
 
-// Stats and Health loaders (unchanged logic)
 async function loadStats() {
     try {
         const response = await fetch('/api/stats');
@@ -524,7 +480,6 @@ async function loadHealth() {
 
 if (sortSelect) sortSelect.addEventListener('change', () => loadEntries());
 
-// Initialize
 document.addEventListener('DOMContentLoaded', () => {
     loadEntries();
     loadStats();

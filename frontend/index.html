@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cluster Ops-Chat // v4.0</title>
-    <link rel="stylesheet" href="styles.css?v=4.0">
+    <title>Cluster Ops-Chat // v4.1</title>
+    <link rel="stylesheet" href="styles.css?v=4.1">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 
     <link rel="preload" as="image" href="success.png">
@@ -19,12 +19,15 @@
 
     <div class="crt-overlay"></div>
 
-    <div id="defconOverlay" class="defcon-warning">SYSTEM COMPROMISED // DEFCON 1</div>
+    <div id="defconOverlay" class="defcon-warning">
+        <div class="defcon-text">SYSTEM COMPROMISED // DEFCON 1</div>
+        <div class="defcon-subtext">Protocol Override Initiated</div>
+    </div>
 
     <main class="container">
         <header class="header">
             <h1>&lt;/&gt; Cluster Ops-Chat<span class="blinking-cursor">_</span></h1>
-            <p class="subtitle">System v4.0 // Node: <span class="highlight">vps-worker-01</span> // Env: <span
+            <p class="subtitle">System v4.1 // Node: <span class="highlight">vps-worker-01</span> // Env: <span
                     class="highlight">PROD</span></p>
         </header>
 
@@ -50,7 +53,7 @@
         <div class="card terminal-card glass-panel">
             <div class="terminal-header">
                 <div class="traffic-lights">
-                    <span class="dot red" id="panicBtn" title="Panic Mode"></span>
+                    <span class="dot red"></span>
                     <span class="dot yellow"></span>
                     <span class="dot green"></span>
                 </div>
@@ -83,6 +86,13 @@
                 <div class="form-group">
                     <label for="message">Payload / Command:</label>
                     <textarea id="message" name="message" required placeholder="Type message or /command..."></textarea>
+                    <div class="command-hints">
+                        <span>available commands:</span>
+                        <span class="cmd">/clear</span>
+                        <span class="cmd">/matrix</span>
+                        <span class="cmd">/weather</span>
+                        <span class="cmd">/panic</span>
+                    </div>
                 </div>
                 <div class="button-container">
                     <button type="submit" class="cyber-button">
@@ -93,6 +103,10 @@
                 </div>
             </form>
         </div>
+
+        <button id="mainPanicBtn" class="panic-button">
+            ⚠ DEFCON TOGGLE
+        </button>
 
         <div class="entries">
             <div class="entries-header">
