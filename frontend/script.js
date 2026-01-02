@@ -64,6 +64,15 @@ function playSound(type) {
         // Catch promise errors if user hasn't interacted with page yet
         sound.play().catch(e => console.log('Audio blocked:', e));
         currentSound = sound;
+
+        // Auto-stop sound after 2 seconds to match sticker duration
+        setTimeout(() => {
+            if (currentSound === sound) {
+                sound.pause();
+                sound.currentTime = 0;
+                currentSound = null;
+            }
+        }, 2000);
     }
 }
 
