@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cluster Ops-Chat // v3.0</title>
-    <link rel="stylesheet" href="styles.css?v=3.0">
+    <title>Cluster Ops-Chat // v4.0</title>
+    <link rel="stylesheet" href="styles.css?v=4.0">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 
     <link rel="preload" as="image" href="success.png">
@@ -15,12 +15,16 @@
 </head>
 
 <body>
+    <canvas id="matrixCanvas"></canvas>
+
     <div class="crt-overlay"></div>
+
+    <div id="defconOverlay" class="defcon-warning">SYSTEM COMPROMISED // DEFCON 1</div>
 
     <main class="container">
         <header class="header">
             <h1>&lt;/&gt; Cluster Ops-Chat<span class="blinking-cursor">_</span></h1>
-            <p class="subtitle">System v3.0 // Node: <span class="highlight">vps-worker-01</span> // Environment: <span
+            <p class="subtitle">System v4.0 // Node: <span class="highlight">vps-worker-01</span> // Env: <span
                     class="highlight">PROD</span></p>
         </header>
 
@@ -46,7 +50,7 @@
         <div class="card terminal-card glass-panel">
             <div class="terminal-header">
                 <div class="traffic-lights">
-                    <span class="dot red"></span>
+                    <span class="dot red" id="panicBtn" title="Panic Mode"></span>
                     <span class="dot yellow"></span>
                     <span class="dot green"></span>
                 </div>
@@ -59,10 +63,26 @@
                         <input type="text" id="name" name="name" required placeholder="devops-engineer"
                             autocomplete="off" autofocus>
                     </div>
+                    <div class="form-group half-width">
+                        <label>Log Severity:</label>
+                        <div class="severity-selector">
+                            <input type="radio" id="lvl-info" name="level" value="INFO" checked>
+                            <label for="lvl-info" class="sev-btn sev-info">INFO</label>
+
+                            <input type="radio" id="lvl-warn" name="level" value="WARNING">
+                            <label for="lvl-warn" class="sev-btn sev-warn">WARN</label>
+
+                            <input type="radio" id="lvl-crit" name="level" value="CRITICAL">
+                            <label for="lvl-crit" class="sev-btn sev-crit">CRIT</label>
+
+                            <input type="radio" id="lvl-succ" name="level" value="SUCCESS">
+                            <label for="lvl-succ" class="sev-btn sev-succ">OK</label>
+                        </div>
+                    </div>
                 </div>
                 <div class="form-group">
-                    <label for="message">Payload:</label>
-                    <textarea id="message" name="message" required placeholder="Checking pod status..."></textarea>
+                    <label for="message">Payload / Command:</label>
+                    <textarea id="message" name="message" required placeholder="Type message or /command..."></textarea>
                 </div>
                 <div class="button-container">
                     <button type="submit" class="cyber-button">
@@ -77,11 +97,17 @@
         <div class="entries">
             <div class="entries-header">
                 <h2 class="neon-subtitle">System Logs</h2>
-                <div class="select-wrapper">
-                    <select id="sortOrder">
-                        <option value="desc">Newest First</option>
-                        <option value="asc">Oldest First</option>
-                    </select>
+                <div class="controls-wrapper">
+                    <div class="grep-container">
+                        <span class="grep-prompt">> grep</span>
+                        <input type="text" id="grepInput" class="grep-input" placeholder="filter logs...">
+                    </div>
+                    <div class="select-wrapper">
+                        <select id="sortOrder">
+                            <option value="desc">Newest First</option>
+                            <option value="asc">Oldest First</option>
+                        </select>
+                    </div>
                 </div>
             </div>
             <div id="entriesList" role="log" aria-live="polite" class="loading">
@@ -130,10 +156,19 @@
         </div>
     </div>
 
+    <div id="stampMenu" class="stamp-menu glass-panel">
+        <button class="stamp-option" data-stamp="APPROVED">APPROVED</button>
+        <button class="stamp-option" data-stamp="LGTM">LGTM</button>
+        <button class="stamp-option" data-stamp="FIXED">FIXED</button>
+        <button class="stamp-option" data-stamp="DEPRECATED" style="color:var(--danger-color)">DEPRECATED</button>
+    </div>
+
     <audio id="success-sound" src="success.mp3" preload="auto"></audio>
     <audio id="error-sound" src="error.mp3" preload="auto"></audio>
     <audio id="update-sound" src="update.mp3" preload="auto"></audio>
     <audio id="delete-sound" src="delete.mp3" preload="auto"></audio>
+    <audio id="siren-sound" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" loop
+        preload="none"></audio>
 
     <script src="script.js" defer></script>
 </body>
