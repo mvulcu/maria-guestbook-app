@@ -197,14 +197,14 @@ function createEntryHTML(entry) {
     const formattedMessage = parseMarkdown(entry.message);
     const rankBadge = calculateRank(entry.name);
 
-    // Stamps Logic - now real data from DB
+    // Stamps Logic (Fixed Position)
     let stampsHTML = '';
     if (entry.stamps && Array.isArray(entry.stamps) && entry.stamps.length > 0) {
-        entry.stamps.forEach(stamp => {
-            // Random rotation for natural look
-            const rot = Math.random() * 20 - 10;
-            stampsHTML += `<div class="stamp-mark" style="transform: translate(50%, -50%) rotate(${rot}deg)">${stamp}</div>`;
-        });
+        // Take only the last stamp to avoid clutter in the center,
+        // or remove [entry.stamps.length - 1] if we want all (but they will overlap).
+        // It's more logical to show the last one placed.
+        const lastStamp = entry.stamps[entry.stamps.length - 1];
+        stampsHTML = `<div class="stamp-mark">${escapeHtml(lastStamp)}</div>`;
     }
 
     return `

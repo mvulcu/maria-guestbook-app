@@ -38,31 +38,37 @@ body.defcon-active .glass-panel {
     box-shadow: 0 0 20px rgba(255, 0, 0, 0.2);
 }
 
-/* Panic Button Styling */
+/* Panic Button - Top Center Position */
 .panic-button {
     position: fixed;
-    bottom: 20px;
-    right: 20px;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
     background: #000;
     border: 2px solid var(--danger-color);
+    border-top: none; /* Looks like it hangs from the top */
     color: var(--danger-color);
-    padding: 15px;
+    padding: 10px 30px;
     font-family: var(--font-mono);
     font-weight: bold;
     cursor: pointer;
     z-index: 5000;
     text-transform: uppercase;
-    box-shadow: 0 0 10px var(--danger-glow);
+    box-shadow: 0 5px 15px rgba(255, 0, 85, 0.2);
+    border-radius: 0 0 10px 10px; /* Rounded bottom corners */
     transition: all 0.3s;
-    /* Prevent text selection on mobile */
     user-select: none;
+    font-size: 0.9em;
+    letter-spacing: 2px;
 }
 
 .panic-button:hover, .panic-button:active {
     background: var(--danger-color);
     color: #fff;
-    box-shadow: 0 0 30px var(--danger-glow);
-    transform: scale(1.05);
+    box-shadow: 0 0 40px var(--danger-glow);
+    /* Important: maintain translateX for centering when scaling */
+    transform: translateX(-50%);
+    padding-top: 20px; /* Pull down effect */
 }
 
 /* Defcon Overlay */
@@ -311,8 +317,39 @@ input#lvl-succ:checked + .sev-succ { background: rgba(0, 255, 157, 0.2); border-
 .code-block { background: #000; color: var(--success-color); padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', Courier, monospace; border: 1px solid #30363d; display: inline-block; max-width: 100%; overflow-x: auto; }
 
 /* Stamps */
-.stamp-mark { position: absolute; top: 50%; right: 20%; transform: translate(50%, -50%) rotate(-15deg); font-size: 2rem; font-weight: 900; text-transform: uppercase; color: var(--success-color); border: 3px solid var(--success-color); padding: 5px 15px; border-radius: 10px; opacity: 0.8; pointer-events: none; z-index: 10; animation: stamp-land 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); background: rgba(0,0,0,0.5); letter-spacing: 5px; }
-@keyframes stamp-land { from { transform: translate(50%, -50%) rotate(-15deg) scale(2); opacity: 0; } to { transform: translate(50%, -50%) rotate(-15deg) scale(1); opacity: 0.8; } }
+.stamp-mark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-10deg);
+    font-size: 3rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    color: var(--success-color);
+    border: 4px solid var(--success-color);
+    padding: 10px 20px;
+    border-radius: 10px;
+    opacity: 0.25;
+    pointer-events: none;
+    z-index: 0;
+    animation: stamp-land 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    white-space: nowrap;
+    max-width: 90%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: 5px;
+}
+
+@keyframes stamp-land {
+    from {
+        transform: translate(-50%, -50%) rotate(-10deg) scale(2);
+        opacity: 0;
+    }
+    to {
+        transform: translate(-50%, -50%) rotate(-10deg) scale(1);
+        opacity: 0.25;
+    }
+}
 
 /* Stamp Menu */
 .stamp-menu { position: absolute; display: none; flex-direction: column; z-index: 5000; padding: 5px; border-radius: 6px; width: 120px; }
@@ -407,21 +444,26 @@ input#lvl-succ:checked + .sev-succ { background: rgba(0, 255, 157, 0.2); border-
         padding: 12px 0; /* Easier to tap */
     }
 
-    /* 6. Panic Button - Smaller & Cornered */
+    /* 6. Panic Button - Mobile Adjustment */
     .panic-button {
-        bottom: 15px;
-        right: 15px;
-        padding: 10px 15px;
-        font-size: 0.75em;
-        opacity: 0.8; /* Semi-transparent so it doesn't block too much */
+        /* Reset any bottom/right positioning if it existed */
+        bottom: auto;
+        right: auto;
+        /* Keep it top center but slightly smaller */
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 8px 20px;
+        font-size: 0.7em;
+        width: auto;
+        white-space: nowrap;
+        border-radius: 0 0 8px 8px;
     }
 
     /* 7. Stamps on Mobile */
     .stamp-mark {
-        font-size: 1.2rem;
-        right: 10px;
-        top: 20px;
-        border-width: 2px;
+        font-size: 2rem;
+        border-width: 3px;
     }
 
     /* 8. Defcon Text Size */
