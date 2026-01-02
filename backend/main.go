@@ -194,11 +194,13 @@ func main() {
 }
 
 func (app *App) initDB() {
+	// 1. Skapa tabellen om den inte finns
 	query := `
 	CREATE TABLE IF NOT EXISTS entries (
 		id SERIAL PRIMARY KEY,
 		name VARCHAR(100) NOT NULL,
 		message TEXT NOT NULL,
+		level VARCHAR(20) DEFAULT 'INFO',
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	)`
 
@@ -206,7 +208,16 @@ func (app *App) initDB() {
 	if err != nil {
 		log.Fatal("Kunde inte skapa tabell:", err)
 	}
-	log.Println("✓ Databas-schema klart")
+
+	// 2. Migrering: Lägg till 'level' kolumnen om den saknas (för existerande installationer)
+	// Vi ignorerar felet om kolumnen redan finns (enkel migrering)
+	migrationQuery := `ALTER TABLE entries ADD COLUMN IF NOT EXISTS level VARCHAR(20) DEFAULT 'INFO';`
+	_, err = app.DB.Exec(migrationQuery)
+	if err != nil {
+		log.Println("ℹ️ Migrering (kan ignoreras om kolumnen finns):", err)
+	}
+
+	log.Println("✓ Databas-schema (v4.0) initierat")
 }
 
 // Background job för att uppdatera metriker
