@@ -21,10 +21,10 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_OWNER: mvulcu
+  IMAGE_OWNER: ${{ github.repository_owner }}
   BACKEND_IMAGE: guestbook-backend
   FRONTEND_IMAGE: guestbook-frontend
-  INFRA_REPO: mvulcu/maria-guestbook-infra
+  INFRA_REPO: ${{ github.repository_owner }}/maria-guestbook-infra
 
 jobs:
   # ===========================================================================
@@ -36,7 +36,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    
+
     outputs:
       image_tag: ${{ steps.meta.outputs.version }}
       short_sha: ${{ steps.vars.outputs.short_sha }}
@@ -101,7 +101,7 @@ jobs:
     name: Update Infra Repo
     needs: build
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout infrastructure repo
         uses: actions/checkout@v4
@@ -113,13 +113,13 @@ jobs:
       - name: Update image tags in values.yaml
         run: |
           cd infra
-          
+
           # Update backend image tag
           sed -i 's|tag: ".*"  # backend-tag|tag: "${{ needs.build.outputs.short_sha }}"  # backend-tag|' helm/guestbook/values.yaml
-          
-          # Update frontend image tag  
+
+          # Update frontend image tag
           sed -i 's|tag: ".*"  # frontend-tag|tag: "${{ needs.build.outputs.short_sha }}"  # frontend-tag|' helm/guestbook/values.yaml
-          
+
           echo "Updated values.yaml:"
           cat helm/guestbook/values.yaml | grep -A2 "image:"
 
@@ -128,9 +128,9 @@ jobs:
           cd infra
           git config user.name "GitHub Actions Bot"
           git config user.email "actions@github.com"
-          
+
           git add helm/guestbook/values.yaml
-          
+
           # Only commit if there are changes
           if git diff --staged --quiet; then
             echo "No changes to commit"
@@ -140,7 +140,7 @@ jobs:
           Triggered by: ${{ github.repository }}@${{ github.sha }}
           Workflow: ${{ github.workflow }}
           Author: ${{ github.actor }}"
-            
+
             git push
             echo "### ✅ Infrastructure Updated" >> $GITHUB_STEP_SUMMARY
             echo "New image tag: \`${{ needs.build.outputs.short_sha }}\`" >> $GITHUB_STEP_SUMMARY
