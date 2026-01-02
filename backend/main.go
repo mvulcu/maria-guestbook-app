@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -18,12 +19,19 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// Entry struct updated to support Stamps
 type Entry struct {
 	ID        int       `json:"id"`
 	Name      string    `json:"name"`
 	Message   string    `json:"message"`
 	Level     string    `json:"level"`
+	StampsRaw string    `json:"-"`      // Internal use for DB scanning
+	Stamps    []string  `json:"stamps"` // Array for JSON output
 	CreatedAt time.Time `json:"created_at"`
+}
+
+type StampRequest struct {
+	Stamp string `json:"stamp"`
 }
 
 type App struct {
@@ -33,15 +41,15 @@ type App struct {
 	Metrics *Metrics
 }
 
-// Prometheus metrics
+// Prometheus metrics (Standard setup)
 type Metrics struct {
-	requestsTotal  *prometheus.CounterVec
-	cacheHits      prometheus.Counter
-	cacheMisses    prometheus.Counter
-	dbEntriesTotal prometheus.Gauge
-	httpDuration   *prometheus.HistogramVec
-	dbUp           prometheus.Gauge
-	redisUp        prometheus.Gauge
+	requestsTotal    *prometheus.CounterVec
+	cacheHits        prometheus.Counter
+	cacheMisses      prometheus.Counter
+	dbEntriesTotal   prometheus.Gauge
+	httpDuration     *prometheus.HistogramVec
+	dbUp             prometheus.Gauge
+	redisUp          prometheus.Gauge
 }
 
 func NewMetrics() *Metrics {
@@ -93,7 +101,6 @@ func NewMetrics() *Metrics {
 		),
 	}
 
-	// Register metrics
 	prometheus.MustRegister(
 		m.requestsTotal,
 		m.cacheHits,
@@ -113,7 +120,7 @@ func main() {
 		Metrics: NewMetrics(),
 	}
 
-	// Initiera databas
+	// Database Connection
 	dbHost := getEnv("DB_HOST", "localhost")
 	dbPort := getEnv("DB_PORT", "5432")
 	dbUser := getEnv("DB_USER", "guestbook")
@@ -126,30 +133,30 @@ func main() {
 	var err error
 	app.DB, err = sql.Open("postgres", dsn)
 	if err != nil {
-		log.Fatal("Kunde inte ansluta till databasen:", err)
+		log.Fatal("DB Connection failed:", err)
 	}
 	defer app.DB.Close()
 
-	// Vänta på databas
+	// Wait for DB
 	for i := 0; i < 30; i++ {
 		err = app.DB.Ping()
 		if err == nil {
 			break
 		}
-		log.Println("Väntar på databas...")
+		log.Println("Waiting for database...")
 		time.Sleep(2 * time.Second)
 	}
 
 	if err != nil {
-		log.Fatal("Databas inte tillgänglig:", err)
+		log.Fatal("Database unreachable:", err)
 	}
 
-	log.Println("✓ Ansluten till PostgreSQL")
+	log.Println("✓ Connected to PostgreSQL")
 
-	// Skapa tabell
+	// Initialize Schema (v4.2 with Stamps)
 	app.initDB()
 
-	// Initiera Redis
+	// Redis Connection
 	redisHost := getEnv("REDIS_HOST", "localhost")
 	redisPort := getEnv("REDIS_PORT", "6379")
 	redisPass := getEnv("REDIS_PASSWORD", "")
@@ -162,21 +169,16 @@ func main() {
 
 	_, err = app.Redis.Ping(app.Ctx).Result()
 	if err != nil {
-		log.Println("⚠ Redis inte tillgänglig, fortsätter utan cache:", err)
+		log.Println("⚠ Redis unreachable, running without cache:", err)
 	} else {
-		log.Println("✓ Ansluten till Redis")
+		log.Println("✓ Connected to Redis")
 	}
 
-	// Starta background job för att uppdatera metrik
 	go app.updateMetricsPeriodically()
 
-	// Setup router
+	// Router Setup
 	r := mux.NewRouter()
-
-	// CORS middleware
 	r.Use(corsMiddleware)
-
-	// Prometheus metrics middleware
 	r.Use(app.metricsMiddleware)
 
 	// Routes
@@ -186,61 +188,58 @@ func main() {
 	r.HandleFunc("/api/entries", app.createEntryHandler).Methods("POST")
 	r.HandleFunc("/api/entries/{id}", app.updateEntryHandler).Methods("PUT")
 	r.HandleFunc("/api/entries/{id}", app.deleteEntryHandler).Methods("DELETE")
+	// NEW: Stamp Endpoint
+	r.HandleFunc("/api/entries/{id}/stamp", app.addStampHandler).Methods("POST")
 	r.HandleFunc("/api/stats", app.statsHandler).Methods("GET")
 
 	port := getEnv("PORT", "8080")
-	log.Printf("🚀 Server startar på port %s", port)
+	log.Printf("🚀 Server v4.2 (Stamps) starting on port %s", port)
 	log.Fatal(http.ListenAndServe(":"+port, r))
 }
 
 func (app *App) initDB() {
-	// 1. Skapa tabellen om den inte finns
+	// 1. Create table
 	query := `
 	CREATE TABLE IF NOT EXISTS entries (
 		id SERIAL PRIMARY KEY,
 		name VARCHAR(100) NOT NULL,
 		message TEXT NOT NULL,
 		level VARCHAR(20) DEFAULT 'INFO',
+		stamps TEXT DEFAULT '',
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	)`
 
 	_, err := app.DB.Exec(query)
 	if err != nil {
-		log.Fatal("Kunde inte skapa tabell:", err)
+		log.Fatal("Table creation failed:", err)
 	}
 
-	// 2. Migrering: Lägg till 'level' kolumnen om den saknas (för existerande installationer)
-	// Vi ignorerar felet om kolumnen redan finns (enkel migrering)
-	migrationQuery := `ALTER TABLE entries ADD COLUMN IF NOT EXISTS level VARCHAR(20) DEFAULT 'INFO';`
-	_, err = app.DB.Exec(migrationQuery)
-	if err != nil {
-		log.Println("ℹ️ Migrering (kan ignoreras om kolumnen finns):", err)
-	}
+	// 2. Migrations for existing DBs
+	// Add level column
+	app.DB.Exec(`ALTER TABLE entries ADD COLUMN IF NOT EXISTS level VARCHAR(20) DEFAULT 'INFO';`)
+	// Add stamps column
+	app.DB.Exec(`ALTER TABLE entries ADD COLUMN IF NOT EXISTS stamps TEXT DEFAULT '';`)
 
-	log.Println("✓ Databas-schema (v4.0) initierat")
+	log.Println("✓ Database Schema (v4.2) initialized")
 }
 
-// Background job för att uppdatera metriker
 func (app *App) updateMetricsPeriodically() {
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		// Uppdatera DB entries count
 		var count int
 		err := app.DB.QueryRow("SELECT COUNT(*) FROM entries").Scan(&count)
 		if err == nil {
 			app.Metrics.dbEntriesTotal.Set(float64(count))
 		}
 
-		// Uppdatera DB status
 		if err := app.DB.Ping(); err != nil {
 			app.Metrics.dbUp.Set(0)
 		} else {
 			app.Metrics.dbUp.Set(1)
 		}
 
-		// Uppdatera Redis status
 		if _, err := app.Redis.Ping(app.Ctx).Result(); err != nil {
 			app.Metrics.redisUp.Set(0)
 		} else {
@@ -249,35 +248,18 @@ func (app *App) updateMetricsPeriodically() {
 	}
 }
 
-// Metrics middleware
 func (app *App) metricsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip /metrics endpoint to avoid recursion
 		if r.URL.Path == "/metrics" {
 			next.ServeHTTP(w, r)
 			return
 		}
-
 		start := time.Now()
-
-		// We use a custom ResponseWriter to capture the status code
 		rw := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
-
 		next.ServeHTTP(rw, r)
-
 		duration := time.Since(start).Seconds()
-
-		// Record metrics
-		app.Metrics.requestsTotal.WithLabelValues(
-			r.Method,
-			r.URL.Path,
-			strconv.Itoa(rw.statusCode),
-		).Inc()
-
-		app.Metrics.httpDuration.WithLabelValues(
-			r.Method,
-			r.URL.Path,
-		).Observe(duration)
+		app.Metrics.requestsTotal.WithLabelValues(r.Method, r.URL.Path, strconv.Itoa(rw.statusCode)).Inc()
+		app.Metrics.httpDuration.WithLabelValues(r.Method, r.URL.Path).Observe(duration)
 	})
 }
 
@@ -292,24 +274,18 @@ func (rw *responseWriter) WriteHeader(code int) {
 }
 
 func (app *App) healthHandler(w http.ResponseWriter, r *http.Request) {
-	health := map[string]interface{}{
-		"status": "healthy",
-		"time":   time.Now(),
-	}
-
+	health := map[string]interface{}{"status": "healthy", "time": time.Now()}
 	if err := app.DB.Ping(); err != nil {
 		health["database"] = "unhealthy"
 		health["status"] = "degraded"
 	} else {
 		health["database"] = "healthy"
 	}
-
 	if _, err := app.Redis.Ping(app.Ctx).Result(); err != nil {
 		health["redis"] = "unhealthy"
 	} else {
 		health["redis"] = "healthy"
 	}
-
 	json.NewEncoder(w).Encode(health)
 }
 
@@ -319,21 +295,16 @@ func (app *App) getEntriesHandler(w http.ResponseWriter, r *http.Request) {
 	if app.Redis != nil {
 		cached, err := app.Redis.Get(app.Ctx, cacheKey).Result()
 		if err == nil && cached != "" {
-			log.Println("✓ Cache hit")
-			app.Metrics.cacheHits.Inc()
 			w.Header().Set("X-Cache", "HIT")
 			w.Header().Set("Content-Type", "application/json")
 			w.Write([]byte(cached))
 			return
-		} else if err != nil {
-			log.Printf("⚠ Cache miss (reason: %v)", err)
-			app.Metrics.cacheMisses.Inc()
 		}
 	}
 
-	// Hämta från databas
+	// Updated Query to fetch stamps
 	rows, err := app.DB.Query(`
-		SELECT id, name, message, level, created_at
+		SELECT id, name, message, level, stamps, created_at
 		FROM entries
 		ORDER BY created_at DESC
 		LIMIT 100
@@ -347,22 +318,23 @@ func (app *App) getEntriesHandler(w http.ResponseWriter, r *http.Request) {
 	entries := []Entry{}
 	for rows.Next() {
 		var e Entry
-		if err := rows.Scan(&e.ID, &e.Name, &e.Message, &e.Level, &e.CreatedAt); err != nil {
+		// Scan stamps into raw string
+		if err := rows.Scan(&e.ID, &e.Name, &e.Message, &e.Level, &e.StampsRaw, &e.CreatedAt); err != nil {
 			continue
+		}
+		// Convert "STAMP1,STAMP2" string to array ["STAMP1", "STAMP2"]
+		if e.StampsRaw != "" {
+			e.Stamps = strings.Split(e.StampsRaw, ",")
+		} else {
+			e.Stamps = []string{}
 		}
 		entries = append(entries, e)
 	}
 
-	// Cacha resultatet
 	if app.Redis != nil {
 		jsonData, err := json.Marshal(entries)
 		if err == nil {
-			err = app.Redis.Set(app.Ctx, cacheKey, jsonData, 5*time.Minute).Err()
-			if err == nil {
-				log.Println("✓ Cache set (TTL: 5 minutes)")
-			} else {
-				log.Printf("⚠ Kunde inte sätta cache: %v", err)
-			}
+			app.Redis.Set(app.Ctx, cacheKey, jsonData, 5*time.Minute)
 		}
 	}
 
@@ -374,20 +346,19 @@ func (app *App) getEntriesHandler(w http.ResponseWriter, r *http.Request) {
 func (app *App) createEntryHandler(w http.ResponseWriter, r *http.Request) {
 	var entry Entry
 	if err := json.NewDecoder(r.Body).Decode(&entry); err != nil {
-		http.Error(w, "Ogiltig data", http.StatusBadRequest)
+		http.Error(w, "Invalid Payload", http.StatusBadRequest)
 		return
 	}
 
-	// Validering
 	if entry.Name == "" || entry.Message == "" {
-		http.Error(w, "Namn och meddelande krävs", http.StatusBadRequest)
+		http.Error(w, "Name and Message required", http.StatusBadRequest)
 		return
 	}
 
-	// Spara i databas
+	// Insert without stamps (default empty)
 	err := app.DB.QueryRow(`
-		INSERT INTO entries (name, message, level)
-		VALUES ($1, $2, $3)
+		INSERT INTO entries (name, message, level, stamps)
+		VALUES ($1, $2, $3, '')
 		RETURNING id, created_at
 	`, entry.Name, entry.Message, entry.Level).Scan(&entry.ID, &entry.CreatedAt)
 
@@ -396,11 +367,8 @@ func (app *App) createEntryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Invalidera cache
 	if app.Redis != nil {
 		app.Redis.Del(app.Ctx, "entries:all")
-		log.Println("🗑️ Cache invaliderad (create)")
-		// Incrementera statistik
 		app.Redis.Incr(app.Ctx, "stats:total_entries")
 	}
 
@@ -409,23 +377,67 @@ func (app *App) createEntryHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(entry)
 }
 
+// NEW: Handler to add a stamp
+func (app *App) addStampHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	var req StampRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid Body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Stamp == "" {
+		http.Error(w, "Stamp required", http.StatusBadRequest)
+		return
+	}
+
+	// Logic: Append new stamp with comma separator
+	// If empty, set it. If not empty, append ",STAMP"
+	query := `
+		UPDATE entries
+		SET stamps = CASE
+			WHEN stamps = '' OR stamps IS NULL THEN $1
+			ELSE stamps || ',' || $1
+		END
+		WHERE id = $2`
+
+	result, err := app.DB.Exec(query, req.Stamp, id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		http.Error(w, "Entry not found", http.StatusNotFound)
+		return
+	}
+
+	if app.Redis != nil {
+		app.Redis.Del(app.Ctx, "entries:all")
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "stamped"})
+}
+
 func (app *App) updateEntryHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
 	var entry Entry
 	if err := json.NewDecoder(r.Body).Decode(&entry); err != nil {
-		http.Error(w, "Ogiltig data", http.StatusBadRequest)
+		http.Error(w, "Invalid data", http.StatusBadRequest)
 		return
 	}
 
-	// Validering
 	if entry.Name == "" || entry.Message == "" {
-		http.Error(w, "Namn och meddelande krävs", http.StatusBadRequest)
+		http.Error(w, "Name and Message required", http.StatusBadRequest)
 		return
 	}
 
-	// Uppdatera i databas
 	result, err := app.DB.Exec(`
 		UPDATE entries
 		SET name = $1, message = $2
@@ -437,56 +449,38 @@ func (app *App) updateEntryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Kontrollera om posten hittades
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		http.Error(w, "Not found", http.StatusNotFound)
 		return
 	}
 
-	if rowsAffected == 0 {
-		http.Error(w, "Inlägg hittades inte", http.StatusNotFound)
-		return
-	}
-
-	// Invalidera cache
 	if app.Redis != nil {
 		app.Redis.Del(app.Ctx, "entries:all")
-		log.Println("🗑️ Cache invaliderad (update)")
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Inlägget uppdaterat"})
+	json.NewEncoder(w).Encode(map[string]string{"message": "Updated"})
 }
 
 func (app *App) deleteEntryHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
-	// Ta bort från databas
 	result, err := app.DB.Exec("DELETE FROM entries WHERE id = $1", id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Kontrollera om posten hittades
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		http.Error(w, "Not found", http.StatusNotFound)
 		return
 	}
 
-	if rowsAffected == 0 {
-		http.Error(w, "Inlägg hittades inte", http.StatusNotFound)
-		return
-	}
-
-	// Invalidera cache
 	if app.Redis != nil {
 		app.Redis.Del(app.Ctx, "entries:all")
-		log.Println("🗑️ Cache invaliderad (delete)")
-		// Decrement statistics
 		app.Redis.Decr(app.Ctx, "stats:total_entries")
 	}
 
@@ -495,18 +489,13 @@ func (app *App) deleteEntryHandler(w http.ResponseWriter, r *http.Request) {
 
 func (app *App) statsHandler(w http.ResponseWriter, r *http.Request) {
 	stats := make(map[string]interface{})
-
-	// Räkna från databas
 	var count int
 	app.DB.QueryRow("SELECT COUNT(*) FROM entries").Scan(&count)
 	stats["total_entries_db"] = count
 
-	// Hämta från Redis om tillgängligt
 	if app.Redis != nil {
 		cacheCount, _ := app.Redis.Get(app.Ctx, "stats:total_entries").Result()
 		stats["total_entries_created"] = cacheCount
-
-		// Cache statistik
 		info, _ := app.Redis.Info(app.Ctx, "stats").Result()
 		if info != "" {
 			stats["cache_available"] = true
@@ -523,12 +512,10 @@ func corsMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		w.Header().Set("Access-Control-Expose-Headers", "X-Cache")
-
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-
 		next.ServeHTTP(w, r)
 	})
 }

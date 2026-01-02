@@ -4,9 +4,9 @@ const nameInput = document.getElementById('name');
 const messageInput = document.getElementById('message');
 const entriesList = document.getElementById('entriesList');
 
-// New UI Elements for v4.1
+// UI Elements v4.2
 const grepInput = document.getElementById('grepInput');
-const mainPanicBtn = document.getElementById('mainPanicBtn'); // The new big button
+const mainPanicBtn = document.getElementById('mainPanicBtn');
 const stampMenu = document.getElementById('stampMenu');
 const matrixCanvas = document.getElementById('matrixCanvas');
 
@@ -40,7 +40,7 @@ let userCounts = {};
 let activeStampId = null;
 let defconActive = false;
 
-// --- UTILS & HELPERS ---
+// --- UTILS ---
 
 function escapeHtml(text) {
     if (!text) return text;
@@ -54,7 +54,6 @@ function parseMarkdown(text) {
     return escaped.replace(/`([^`]+)`/g, '<span class="code-block">$1</span>');
 }
 
-// Audio Engine
 function playSound(type) {
     const soundMap = {
         'success': 'success-sound',
@@ -62,7 +61,6 @@ function playSound(type) {
         'update': 'update-sound',
         'delete': 'delete-sound'
     };
-
     const soundId = soundMap[type];
     if (!soundId) return;
 
@@ -70,11 +68,10 @@ function playSound(type) {
         currentSound.pause();
         currentSound.currentTime = 0;
     }
-
     const sound = document.getElementById(soundId);
     if (sound) {
         sound.currentTime = 0;
-        sound.play().catch(e => console.log('Audio blocked:', e));
+        sound.play().catch(e => { });
         currentSound = sound;
     }
 }
@@ -92,7 +89,7 @@ function showFeedbackIcon(type) {
     setTimeout(() => { feedbackIcon.classList.remove('show'); }, 2000);
 }
 
-// --- MODAL LOGIC ---
+// --- MODALS ---
 function showModal(message) {
     if (!modalOverlay || !modalText) return;
     modalText.textContent = message;
@@ -108,12 +105,9 @@ function hideEditModal() { if (editModal) editModal.classList.remove('show'); if
 
 if (deleteCancelBtn) deleteCancelBtn.addEventListener('click', hideDeleteModal);
 if (editCancelBtn) editCancelBtn.addEventListener('click', hideEditModal);
-if (deleteModal) deleteModal.addEventListener('click', (e) => { if (e.target === deleteModal) hideDeleteModal(); });
-if (editModal) editModal.addEventListener('click', (e) => { if (e.target === editModal) hideEditModal(); });
 
-// --- FEATURES & COMMANDS ---
+// --- FEATURES ---
 
-// Matrix Canvas
 let matrixInterval;
 function toggleMatrix() {
     const ctx = matrixCanvas.getContext('2d');
@@ -122,7 +116,7 @@ function toggleMatrix() {
     if (isActive) {
         matrixCanvas.width = window.innerWidth;
         matrixCanvas.height = window.innerHeight;
-        const chars = "0101010101アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン";
+        const chars = "0101010101XYZ";
         const fontSize = 16;
         const columns = matrixCanvas.width / fontSize;
         const drops = Array(Math.floor(columns)).fill(1);
@@ -132,7 +126,6 @@ function toggleMatrix() {
             ctx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
             ctx.fillStyle = "#0F0";
             ctx.font = fontSize + "px monospace";
-
             for (let i = 0; i < drops.length; i++) {
                 const text = chars.charAt(Math.floor(Math.random() * chars.length));
                 ctx.fillText(text, i * fontSize, drops[i] * fontSize);
@@ -147,7 +140,6 @@ function toggleMatrix() {
     }
 }
 
-// Defcon Mode
 function toggleDefcon() {
     defconActive = !defconActive;
     const body = document.body;
@@ -169,7 +161,6 @@ function toggleDefcon() {
 }
 if (mainPanicBtn) mainPanicBtn.addEventListener('click', toggleDefcon);
 
-// Clickable Hints
 document.querySelectorAll('.command-hints .cmd').forEach(cmd => {
     cmd.addEventListener('click', () => {
         messageInput.value = cmd.textContent;
@@ -177,7 +168,6 @@ document.querySelectorAll('.command-hints .cmd').forEach(cmd => {
     });
 });
 
-// Rank Calculation - LOWER THRESHOLDS for testing
 function calculateRank(username) {
     const count = userCounts[username] || 0;
     if (count > 5) return '<span class="rank-badge rank-high">CYBER-GOD</span>';
@@ -188,33 +178,32 @@ function calculateRank(username) {
 function processSlashCommand(cmd) {
     const command = cmd.trim().toLowerCase();
     switch (command) {
-        case '/clear': entriesList.innerHTML = ''; showModal('Terminal Buffer Cleared.'); return true;
+        case '/clear': entriesList.innerHTML = ''; return true;
         case '/matrix': toggleMatrix(); return true;
-        case '/weather': showModal('Server Room Temp: 18°C. Humidity: 40%. Status: OPTIMAL.'); return true;
         case '/panic': toggleDefcon(); return true;
         default: return false;
     }
 }
 
-// --- RENDER LOGIC ---
+// --- RENDER ---
 
 function createEntryHTML(entry) {
     const opacityStyle = entry.isTemp ? 'style="opacity: 0.6; filter: grayscale(0.5);"' : '';
     const date = new Date(entry.created_at);
     const dateStr = date.toLocaleDateString('en-US');
     const timeStr = date.toLocaleTimeString('en-US');
-
-    // Default level to INFO if missing from backend
     const level = entry.level || 'INFO';
     const severityClass = `lvl-${level}`;
-
     const formattedMessage = parseMarkdown(entry.message);
     const rankBadge = calculateRank(entry.name);
 
+    // Stamps Logic - now real data from DB
     let stampsHTML = '';
-    if (entry.stamps && Array.isArray(entry.stamps)) {
+    if (entry.stamps && Array.isArray(entry.stamps) && entry.stamps.length > 0) {
         entry.stamps.forEach(stamp => {
-            stampsHTML += `<div class="stamp-mark" style="transform: translate(50%, -50%) rotate(${Math.random() * 20 - 10}deg)">${stamp}</div>`;
+            // Random rotation for natural look
+            const rot = Math.random() * 20 - 10;
+            stampsHTML += `<div class="stamp-mark" style="transform: translate(50%, -50%) rotate(${rot}deg)">${stamp}</div>`;
         });
     }
 
@@ -247,26 +236,26 @@ function renderSingleEntry(entry, prepend = true) {
     }
 }
 
+// --- API ---
+
 async function loadEntries() {
     try {
         const response = await fetch('/api/entries', { cache: 'no-store' });
         const cacheHeader = response.headers.get('X-Cache');
         if (cacheStatusEl) {
-            if (cacheHeader === 'HIT') {
-                cacheStatusEl.innerHTML = 'REDIS <span style="color:var(--success-color)">(HIT)</span>';
-            } else if (cacheHeader === 'MISS') {
-                cacheStatusEl.innerHTML = 'DB <span style="color:#f59e0b">(MISS)</span>';
-            } else {
-                cacheStatusEl.textContent = 'CONNECTING...';
-            }
+            cacheStatusEl.innerHTML = (cacheHeader === 'HIT')
+                ? 'REDIS <span style="color:var(--success-color)">(HIT)</span>'
+                : 'DB <span style="color:#f59e0b">(MISS)</span>';
         }
         if (cacheTimestampEl) cacheTimestampEl.textContent = new Date().toLocaleTimeString('en-US', { hour12: false });
 
         const entries = await response.json();
 
+        // Recalculate ranks
         userCounts = {};
         entries.forEach(e => { userCounts[e.name] = (userCounts[e.name] || 0) + 1; });
 
+        // Apply Grep
         const filterVal = grepInput.value.toLowerCase();
         const filteredEntries = entries.filter(e =>
             e.name.toLowerCase().includes(filterVal) ||
@@ -295,8 +284,6 @@ async function loadEntries() {
     }
 }
 
-// --- API OPS ---
-
 async function createEntry(name, message, level) {
     const response = await fetch('/api/entries', {
         method: 'POST',
@@ -315,16 +302,19 @@ async function updateEntry(id, name, message) {
     if (!response.ok) throw new Error('API Error');
 }
 
+// REAL STAMP API CALL
 async function addStamp(id, stampType) {
-    console.log(`[API MOCK] Adding stamp ${stampType} to entry ${id}`);
-    const entryDiv = document.querySelector(`.entry[data-id="${id}"]`);
-    if (entryDiv) {
-        const stampHTML = `<div class="stamp-mark" style="transform: translate(50%, -50%) rotate(${Math.random() * 20 - 10}deg)">${stampType}</div>`;
-        entryDiv.insertAdjacentHTML('afterbegin', stampHTML);
-        // Play stamp sound from Google assets since we don't have custom one
-        const audio = new Audio('https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg');
-        audio.play().catch(e => { });
-    }
+    const response = await fetch(`/api/entries/${id}/stamp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stamp: stampType })
+    });
+    if (!response.ok) throw new Error('Failed to stamp');
+
+    // Play sound and refresh data to show the stamp permanently
+    const audio = new Audio('https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg');
+    audio.play().catch(e => { });
+    loadEntries();
 }
 
 async function deleteEntry(id) {
@@ -344,12 +334,11 @@ if (deleteConfirmBtn) {
             hideDeleteModal();
             showFeedbackIcon('delete');
             playSound('delete');
-            await loadEntries();
-        } catch (error) {
+            loadEntries();
+        } catch (e) {
             hideDeleteModal();
-            showFeedbackIcon('error');
             playSound('error');
-            showModal('System refused deletion command.');
+            showModal('Delete failed.');
         }
     });
 }
@@ -360,16 +349,15 @@ if (editForm) {
         if (!currentEntryId) return;
         const name = editNameInput.value.trim();
         const message = editMessageInput.value.trim();
-        if (!name || !message) return;
         try {
             await updateEntry(currentEntryId, name, message);
             hideEditModal();
             showFeedbackIcon('update');
             playSound('update');
-            await loadEntries();
-        } catch (error) {
+            loadEntries();
+        } catch (e) {
             hideEditModal();
-            showModal('Update packet lost.');
+            showModal('Update failed.');
         }
     });
 }
@@ -379,69 +367,58 @@ if (entryForm) {
         e.preventDefault();
         const name = nameInput.value.trim();
         const message = messageInput.value.trim();
-
         const levelSelector = document.querySelector('input[name="level"]:checked');
         const level = levelSelector ? levelSelector.value : 'INFO';
 
-        if (!name || !message) {
-            playSound('error');
-            return;
-        }
+        if (!name || !message) { playSound('error'); return; }
 
         if (message.startsWith('/')) {
-            const isCommand = processSlashCommand(message);
-            if (isCommand) {
+            if (processSlashCommand(message)) {
                 messageInput.value = '';
                 return;
             }
         }
 
+        // Optimistic UI
         const fakeId = 'temp-' + Date.now();
-        const tempEntry = {
-            id: fakeId, name: name, message: message,
-            created_at: new Date().toISOString(),
-            level: level, isTemp: true
-        };
-
+        const tempEntry = { id: fakeId, name, message, level, created_at: new Date().toISOString(), isTemp: true };
         renderSingleEntry(tempEntry, true);
         entryForm.reset();
-        document.getElementById('lvl-info').checked = true;
         showFeedbackIcon('success');
         playSound('success');
 
         try {
             await createEntry(name, message, level);
-            await loadEntries();
+            loadEntries();
             loadStats();
-        } catch (error) {
+        } catch (e) {
             document.querySelector(`[data-id="${fakeId}"]`)?.remove();
             playSound('error');
-            showModal('Transmission failed.');
+            showModal('Send failed.');
         }
     });
 }
 
 if (entriesList) {
-    entriesList.addEventListener('click', async (e) => {
+    entriesList.addEventListener('click', (e) => {
         const btn = e.target.closest('button');
         if (!btn) return;
         const id = btn.dataset.id;
 
-        if (btn.classList.contains('delete-btn')) {
-            showDeleteModal(id);
-        } else if (btn.classList.contains('edit-btn')) {
-            const entryEl = btn.closest('.entry');
-            const nameEl = entryEl.querySelector('.entry-name');
-            // Extract clean name without badge
-            const cleanName = nameEl.childNodes[0].textContent.trim();
-            const msgEl = entryEl.querySelector('.entry-message');
-            showEditModal(id, cleanName, msgEl.textContent);
-        } else if (btn.classList.contains('stamp-btn')) {
+        if (btn.classList.contains('stamp-btn')) {
             activeStampId = id;
             stampMenu.style.top = `${e.pageY}px`;
             stampMenu.style.left = `${e.pageX}px`;
             stampMenu.classList.add('show');
             e.stopPropagation();
+        } else if (btn.classList.contains('delete-btn')) {
+            showDeleteModal(id);
+        } else if (btn.classList.contains('edit-btn')) {
+            const entryEl = btn.closest('.entry');
+            const nameEl = entryEl.querySelector('.entry-name');
+            const cleanName = nameEl.childNodes[0].textContent.trim();
+            const msgEl = entryEl.querySelector('.entry-message');
+            showEditModal(id, cleanName, msgEl.textContent);
         }
     });
 }
@@ -461,19 +438,19 @@ document.addEventListener('click', () => { if (stampMenu) stampMenu.classList.re
 
 async function loadStats() {
     try {
-        const response = await fetch('/api/stats');
-        const stats = await response.json();
-        if (totalEntriesEl) totalEntriesEl.textContent = stats.total_entries_db || 0;
-    } catch (e) { if (totalEntriesEl) totalEntriesEl.textContent = 'ERR'; }
+        const r = await fetch('/api/stats');
+        const s = await r.json();
+        if (totalEntriesEl) totalEntriesEl.textContent = s.total_entries_db || 0;
+    } catch (e) { }
 }
 
 async function loadHealth() {
     try {
-        const response = await fetch('/health');
-        const health = await response.json();
+        const r = await fetch('/health');
+        const h = await r.json();
         if (healthStatusEl) {
-            healthStatusEl.textContent = health.status === 'healthy' ? 'ONLINE' : 'DEGRADED';
-            healthStatusEl.style.color = health.status === 'healthy' ? 'var(--success-color)' : 'var(--danger-color)';
+            healthStatusEl.textContent = h.status === 'healthy' ? 'ONLINE' : 'DEGRADED';
+            healthStatusEl.style.color = h.status === 'healthy' ? 'var(--success-color)' : 'var(--danger-color)';
         }
     } catch (e) { if (healthStatusEl) healthStatusEl.textContent = 'OFFLINE'; }
 }
