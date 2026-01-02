@@ -23,15 +23,14 @@ const editMessageInput = document.getElementById('editMessage');
 const editCancelBtn = document.getElementById('editCancelBtn');
 
 let currentEntryId = null;
+let currentSound = null;
 
 function escapeHtml(text) {
+    if (!text) return text;
     const div = document.createElement('div');
-    div.textContent = text;
+    div.innerText = text;
     return div.innerHTML;
 }
-
-
-let currentSound = null;
 
 function playSound(type) {
     const soundMap = {
@@ -52,7 +51,7 @@ function playSound(type) {
     const sound = document.getElementById(soundId);
     if (sound) {
         sound.currentTime = 0;
-        sound.play().catch(() => {});
+        sound.play().catch(() => { });
         currentSound = sound;
 
         setTimeout(() => {
@@ -64,7 +63,6 @@ function playSound(type) {
         }, 2000);
     }
 }
-
 
 function showFeedbackIcon(type) {
     if (!feedbackIcon) return;
@@ -84,7 +82,6 @@ function showFeedbackIcon(type) {
         feedbackIcon.style.opacity = '0';
     }, 2000);
 }
-
 
 function showModal(message) {
     if (!modalOverlay || !modalText) return;
@@ -211,6 +208,39 @@ if (editForm) {
     });
 }
 
+function createEntryHTML(entry) {
+    const opacityStyle = entry.isTemp ? 'style="opacity: 0.7"' : '';
+    const date = new Date(entry.created_at);
+    const dateStr = date.toLocaleDateString('en-US');
+    const timeStr = date.toLocaleTimeString('en-US');
+
+    return `
+        <div class="entry" data-id="${entry.id}" ${opacityStyle}>
+            <div class="entry-header">
+                <div>
+                    <span class="entry-name">${escapeHtml(entry.name)}</span>
+                    <span class="entry-date">${dateStr} ${timeStr}</span>
+                </div>
+                <div class="entry-actions">
+                    <button class="entry-btn edit-btn" data-id="${entry.id}" ${entry.isTemp ? 'disabled' : ''}>Edit</button>
+                    <button class="entry-btn delete-btn" data-id="${entry.id}" ${entry.isTemp ? 'disabled' : ''}>Purge</button>
+                </div>
+            </div>
+            <div class="entry-message">${escapeHtml(entry.message)}</div>
+        </div>
+    `;
+}
+
+function renderSingleEntry(entry, prepend = true) {
+    const html = createEntryHTML(entry);
+    const order = sortSelect ? sortSelect.value : 'desc';
+
+    if (prepend && order === 'desc') {
+        entriesList.insertAdjacentHTML('afterbegin', html);
+    } else {
+        entriesList.insertAdjacentHTML('beforeend', html);
+    }
+}
 
 async function loadEntries() {
     try {
@@ -218,9 +248,6 @@ async function loadEntries() {
             cache: 'no-store'
         });
         const cacheHeader = response.headers.get('X-Cache');
-
-        console.log('X-Cache header:', cacheHeader);
-
 
         if (cacheStatusEl) {
             if (cacheHeader === 'HIT') {
@@ -251,36 +278,21 @@ async function loadEntries() {
         });
 
         if (!entries.length) {
-            entriesList.innerHTML = '<div class="entry">System log empty. Initialize sequence...</div>';
+            entriesList.innerHTML = '<div class="entry">System log empty...</div>';
             return;
         }
 
-        entriesList.innerHTML = entries.map(entry => {
-            const date = new Date(entry.created_at);
-            const dateStr = date.toLocaleDateString('en-US');
-            const timeStr = date.toLocaleTimeString('en-US');
-            return `
-                <div class="entry" data-id="${entry.id}">
-                    <div class="entry-header">
-                        <div>
-                            <span class="entry-name">${escapeHtml(entry.name)}</span>
-                            <span class="entry-date">${dateStr} ${timeStr}</span>
-                        </div>
-                        <div class="entry-actions">
-                            <button class="entry-btn edit-btn" data-id="${entry.id}">Edit</button>
-                            <button class="entry-btn delete-btn" data-id="${entry.id}">Purge</button>
-                        </div>
-                    </div>
-                    <div class="entry-message">${escapeHtml(entry.message)}</div>
-                </div>
-            `;
-        }).join('');
+        const htmlString = entries.map(entry => createEntryHTML(entry)).join('');
+
+        if (entriesList.innerHTML !== htmlString) {
+            entriesList.innerHTML = htmlString;
+        }
+
     } catch (error) {
         entriesList.innerHTML =
             '<div class="error">Connection Failed. Backend Service Unreachable.</div>';
     }
 }
-
 
 async function loadStats() {
     try {
@@ -295,7 +307,6 @@ async function loadStats() {
         }
     }
 }
-
 
 async function loadHealth() {
     try {
@@ -321,7 +332,6 @@ async function loadHealth() {
         }
     }
 }
-
 
 async function createEntry(name, message) {
     const response = await fetch('/api/entries', {
@@ -358,7 +368,6 @@ async function deleteEntry(id) {
     }
 }
 
-
 if (entryForm) {
     entryForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -372,23 +381,33 @@ if (entryForm) {
             return;
         }
 
+        const fakeId = Date.now().toString();
+        const tempEntry = {
+            id: fakeId,
+            name: name,
+            message: message,
+            created_at: new Date().toISOString(),
+            isTemp: true
+        };
+
+        renderSingleEntry(tempEntry, true);
+        entryForm.reset();
+        showFeedbackIcon('success');
+        playSound('success');
+
         try {
             await createEntry(name, message);
-            entryForm.reset();
-
-            showFeedbackIcon('success');
-            playSound('success');
-
             await loadEntries();
             await loadStats();
         } catch (error) {
+            const tempElement = document.querySelector(`[data-id="${fakeId}"]`);
+            if (tempElement) tempElement.remove();
+
             playSound('error');
             showModal('Write Failed. Retrying...');
-
         }
     });
 }
-
 
 if (entriesList) {
     entriesList.addEventListener('click', async (e) => {
@@ -415,13 +434,11 @@ if (entriesList) {
     });
 }
 
-
 if (sortSelect) {
     sortSelect.addEventListener('change', () => {
         loadEntries();
     });
 }
-
 
 loadEntries();
 loadStats();

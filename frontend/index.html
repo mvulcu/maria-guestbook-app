@@ -5,9 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cluster Ops-Chat</title>
-    <link rel="stylesheet" href="styles.css?v=2.0">
+    <link rel="stylesheet" href="styles.css?v=2.1">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-    <!-- Preload Stickers to prevent lag -->
     <link rel="preload" as="image" href="success.png">
     <link rel="preload" as="image" href="error.png">
     <link rel="preload" as="image" href="update.png">
@@ -15,11 +14,11 @@
 </head>
 
 <body>
-    <div class="container">
-        <div class="header">
+    <main class="container">
+        <header class="header">
             <h1>&lt;/&gt; Cluster Ops-Chat</h1>
-            <p>System v2.0 // Node: vps-worker-01</p>
-        </div>
+            <p>System v2.1 // Node: vps-worker-01</p>
+        </header>
 
         <div class="stats" id="stats">
             <div class="stat-item">
@@ -50,7 +49,8 @@
             <form id="entryForm" novalidate>
                 <div class="form-group">
                     <label for="name">User Identity:</label>
-                    <input type="text" id="name" name="name" required placeholder="devops-engineer" autocomplete="off">
+                    <input type="text" id="name" name="name" required placeholder="devops-engineer" autocomplete="off"
+                        autofocus>
                 </div>
                 <div class="form-group">
                     <label for="message">Command / Message:</label>
@@ -71,9 +71,9 @@
                     <option value="asc">Oldest First</option>
                 </select>
             </div>
-            <div id="entriesList" class="loading">Fetching logs...</div>
+            <div id="entriesList" role="log" aria-live="polite" class="loading">Fetching logs...</div>
         </div>
-    </div>
+    </main>
 
     <div class="modal-overlay" id="validationModal">
         <div class="modal-content">
@@ -121,7 +121,6 @@
     <audio id="delete-sound" src="delete.mp3" preload="auto"></audio>
 
     <script src="script.js" defer></script>
-
 </body>
 
 </html>
