@@ -22,8 +22,8 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_OWNER: ${{ github.repository_owner }}
-  BACKEND_IMAGE: guestbook-backend
-  FRONTEND_IMAGE: guestbook-frontend
+  BACKEND_IMAGE: maria-guestbook-backend
+  FRONTEND_IMAGE: maria-guestbook-frontend
   INFRA_REPO: ${{ github.repository_owner }}/maria-guestbook-infra
 
 jobs:
