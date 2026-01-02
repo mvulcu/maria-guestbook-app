@@ -4,9 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cluster Ops-Chat</title>
-    <link rel="stylesheet" href="styles.css?v=2.1">
+    <title>Cluster Ops-Chat // v3.0</title>
+    <link rel="stylesheet" href="styles.css?v=3.0">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
     <link rel="preload" as="image" href="success.png">
     <link rel="preload" as="image" href="error.png">
     <link rel="preload" as="image" href="update.png">
@@ -14,50 +15,60 @@
 </head>
 
 <body>
+    <div class="crt-overlay"></div>
+
     <main class="container">
         <header class="header">
-            <h1>&lt;/&gt; Cluster Ops-Chat</h1>
-            <p>System v2.1 // Node: vps-worker-01</p>
+            <h1>&lt;/&gt; Cluster Ops-Chat<span class="blinking-cursor">_</span></h1>
+            <p class="subtitle">System v3.0 // Node: <span class="highlight">vps-worker-01</span> // Environment: <span
+                    class="highlight">PROD</span></p>
         </header>
 
         <div class="stats" id="stats">
-            <div class="stat-item">
-                <div class="stat-value" id="totalEntries">-</div>
-                <div class="stat-label">Messages</div>
+            <div class="stat-item glass-panel">
+                <div class="stat-value neon-text" id="totalEntries">-</div>
+                <div class="stat-label">Total Logs</div>
             </div>
-            <div class="stat-item">
+            <div class="stat-item glass-panel">
                 <div class="stat-value" id="cacheStatus">-</div>
-                <div class="stat-label">Cache State <span class="info-icon">ⓘ</span></div>
+                <div class="stat-label">Cache State <span class="info-icon" title="Redis Cache Status">ⓘ</span></div>
             </div>
-            <div class="stat-item">
-                <div class="stat-value" id="cacheTimestamp">-</div>
+            <div class="stat-item glass-panel">
+                <div class="stat-value monospace-font" id="cacheTimestamp">-</div>
                 <div class="stat-label">Last Sync</div>
             </div>
-            <div class="stat-item">
+            <div class="stat-item glass-panel">
                 <div class="stat-value stat-icon" id="healthStatus">-</div>
                 <div class="stat-label">System Health</div>
             </div>
         </div>
 
-        <div class="card terminal-card">
+        <div class="card terminal-card glass-panel">
             <div class="terminal-header">
-                <span class="dot red"></span>
-                <span class="dot yellow"></span>
-                <span class="dot green"></span>
-                <span class="terminal-title">user@entry-pod:~</span>
+                <div class="traffic-lights">
+                    <span class="dot red"></span>
+                    <span class="dot yellow"></span>
+                    <span class="dot green"></span>
+                </div>
+                <span class="terminal-title">root@entry-pod:~</span>
             </div>
             <form id="entryForm" novalidate>
-                <div class="form-group">
-                    <label for="name">User Identity:</label>
-                    <input type="text" id="name" name="name" required placeholder="devops-engineer" autocomplete="off"
-                        autofocus>
+                <div class="form-row">
+                    <div class="form-group half-width">
+                        <label for="name">User Identity:</label>
+                        <input type="text" id="name" name="name" required placeholder="devops-engineer"
+                            autocomplete="off" autofocus>
+                    </div>
                 </div>
                 <div class="form-group">
-                    <label for="message">Command / Message:</label>
-                    <textarea id="message" name="message" required placeholder="echo 'Hello World'"></textarea>
+                    <label for="message">Payload:</label>
+                    <textarea id="message" name="message" required placeholder="Checking pod status..."></textarea>
                 </div>
                 <div class="button-container">
-                    <button type="submit">Execute Send >_</button>
+                    <button type="submit" class="cyber-button">
+                        <span class="btn-text">EXECUTE SEND >_</span>
+                        <span class="btn-glitch"></span>
+                    </button>
                     <img src="" alt="feedback" class="feedback-image" id="feedback-icon">
                 </div>
             </form>
@@ -65,51 +76,55 @@
 
         <div class="entries">
             <div class="entries-header">
-                <h2>System Logs</h2>
-                <select id="sortOrder">
-                    <option value="desc">Newest First</option>
-                    <option value="asc">Oldest First</option>
-                </select>
+                <h2 class="neon-subtitle">System Logs</h2>
+                <div class="select-wrapper">
+                    <select id="sortOrder">
+                        <option value="desc">Newest First</option>
+                        <option value="asc">Oldest First</option>
+                    </select>
+                </div>
             </div>
-            <div id="entriesList" role="log" aria-live="polite" class="loading">Fetching logs...</div>
+            <div id="entriesList" role="log" aria-live="polite" class="loading">
+                Initializing connection...
+            </div>
         </div>
     </main>
 
     <div class="modal-overlay" id="validationModal">
-        <div class="modal-content">
-            <img src="error.png" alt="Sticker" class="modal-image">
-            <div class="modal-text" id="modalText">Please fill out this field</div>
+        <div class="modal-content glass-panel">
+            <img src="error.png" alt="Error" class="modal-image pulse-red">
+            <div class="modal-text" id="modalText">Input required</div>
             <button type="button" class="modal-button" id="modalCloseBtn">ACKNOWLEDGE</button>
         </div>
     </div>
 
     <div class="modal-overlay" id="deleteConfirmModal">
-        <div class="modal-content modal-confirm">
-            <h3>Confirm Deletion</h3>
-            <p>Are you sure you want to purge this log entry?</p>
+        <div class="modal-content glass-panel modal-confirm">
+            <h3 class="warning-text">⚠ CONFIRM PURGE</h3>
+            <p>Are you sure you want to drop this packet? This action is irreversible.</p>
             <div class="modal-buttons">
-                <button type="button" class="modal-button modal-button-cancel" id="deleteCancelBtn">Cancel</button>
-                <button type="button" class="modal-button modal-button-danger" id="deleteConfirmBtn">Confirm
-                    Purge</button>
+                <button type="button" class="modal-button modal-button-cancel" id="deleteCancelBtn">CANCEL</button>
+                <button type="button" class="modal-button modal-button-danger" id="deleteConfirmBtn">CONFIRM
+                    DELETE</button>
             </div>
         </div>
     </div>
 
     <div class="modal-overlay" id="editModal">
-        <div class="modal-content modal-edit">
+        <div class="modal-content glass-panel modal-edit">
             <h3>Edit Log Entry</h3>
             <form id="editForm">
                 <div class="form-group">
                     <label for="editName">User Identity:</label>
-                    <input type="text" id="editName" name="name" required placeholder="devops-engineer">
+                    <input type="text" id="editName" name="name" required>
                 </div>
                 <div class="form-group">
-                    <label for="editMessage">Message Payload:</label>
-                    <textarea id="editMessage" name="message" required placeholder="Content..."></textarea>
+                    <label for="editMessage">Payload:</label>
+                    <textarea id="editMessage" name="message" required></textarea>
                 </div>
                 <div class="modal-buttons">
-                    <button type="button" class="modal-button modal-button-cancel" id="editCancelBtn">Discard</button>
-                    <button type="submit" class="modal-button modal-button-primary">Commit Changes</button>
+                    <button type="button" class="modal-button modal-button-cancel" id="editCancelBtn">DISCARD</button>
+                    <button type="submit" class="modal-button modal-button-primary">COMMIT</button>
                 </div>
             </form>
         </div>
