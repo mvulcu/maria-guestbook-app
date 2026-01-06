@@ -438,6 +438,7 @@ input#lvl-succ:checked + .sev-succ { background: rgba(0, 255, 157, 0.2); border-
         border-top: 1px solid rgba(255,255,255,0.1);
         padding-top: 10px;
     }
+
     .entry-btn {
         width: 100%;
         text-align: center;
