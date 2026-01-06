@@ -216,9 +216,13 @@ func (app *App) initDB() {
 
 	// 2. Migrations for existing DBs
 	// Add level column
-	app.DB.Exec(`ALTER TABLE entries ADD COLUMN IF NOT EXISTS level VARCHAR(20) DEFAULT 'INFO';`)
+	if _, err := app.DB.Exec(`ALTER TABLE entries ADD COLUMN IF NOT EXISTS level VARCHAR(20) DEFAULT 'INFO';`); err != nil {
+		log.Println("Migration warning (level):", err)
+	}
 	// Add stamps column
-	app.DB.Exec(`ALTER TABLE entries ADD COLUMN IF NOT EXISTS stamps TEXT DEFAULT '';`)
+	if _, err := app.DB.Exec(`ALTER TABLE entries ADD COLUMN IF NOT EXISTS stamps TEXT DEFAULT '';`); err != nil {
+		log.Println("Migration warning (stamps):", err)
+	}
 
 	log.Println("✓ Database Schema (v4.2) initialized")
 }
@@ -286,7 +290,7 @@ func (app *App) healthHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		health["redis"] = "healthy"
 	}
-	json.NewEncoder(w).Encode(health)
+	_ = json.NewEncoder(w).Encode(health)
 }
 
 func (app *App) getEntriesHandler(w http.ResponseWriter, r *http.Request) {
@@ -297,7 +301,7 @@ func (app *App) getEntriesHandler(w http.ResponseWriter, r *http.Request) {
 		if err == nil && cached != "" {
 			w.Header().Set("X-Cache", "HIT")
 			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(cached))
+			_, _ = w.Write([]byte(cached))
 			return
 		}
 	}
@@ -340,7 +344,7 @@ func (app *App) getEntriesHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("X-Cache", "MISS")
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(entries)
+	_ = json.NewEncoder(w).Encode(entries)
 }
 
 func (app *App) createEntryHandler(w http.ResponseWriter, r *http.Request) {
@@ -374,7 +378,7 @@ func (app *App) createEntryHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(entry)
+	_ = json.NewEncoder(w).Encode(entry)
 }
 
 // NEW: Handler to add a stamp
@@ -420,7 +424,7 @@ func (app *App) addStampHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "stamped"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "stamped"})
 }
 
 func (app *App) updateEntryHandler(w http.ResponseWriter, r *http.Request) {
@@ -460,7 +464,7 @@ func (app *App) updateEntryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Updated"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"message": "Updated"})
 }
 
 func (app *App) deleteEntryHandler(w http.ResponseWriter, r *http.Request) {
@@ -490,7 +494,7 @@ func (app *App) deleteEntryHandler(w http.ResponseWriter, r *http.Request) {
 func (app *App) statsHandler(w http.ResponseWriter, r *http.Request) {
 	stats := make(map[string]interface{})
 	var count int
-	app.DB.QueryRow("SELECT COUNT(*) FROM entries").Scan(&count)
+	_ = app.DB.QueryRow("SELECT COUNT(*) FROM entries").Scan(&count)
 	stats["total_entries_db"] = count
 
 	if app.Redis != nil {
@@ -503,7 +507,7 @@ func (app *App) statsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(stats)
+	_ = json.NewEncoder(w).Encode(stats)
 }
 
 func corsMiddleware(next http.Handler) http.Handler {

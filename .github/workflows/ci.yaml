@@ -109,6 +109,16 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Scan Backend Image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.BACKEND_IMAGE }}:${{ steps.vars.outputs.short_sha }}'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
       # ----- Frontend Image -----
       - name: Build and push Frontend
         uses: docker/build-push-action@v5
@@ -120,6 +130,16 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.FRONTEND_IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Scan Frontend Image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.FRONTEND_IMAGE }}:${{ steps.vars.outputs.short_sha }}'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
 
       - name: Summary
         run: |
