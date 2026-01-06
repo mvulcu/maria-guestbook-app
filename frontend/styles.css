@@ -460,6 +460,7 @@ input#lvl-succ:checked + .sev-succ { background: rgba(0, 255, 157, 0.2); border-
         border-radius: 0 0 8px 8px;
     }
 
+
     /* 7. Stamps on Mobile */
     .stamp-mark {
         font-size: 2rem;
