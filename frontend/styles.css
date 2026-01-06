@@ -444,7 +444,6 @@ input#lvl-succ:checked + .sev-succ { background: rgba(0, 255, 157, 0.2); border-
         text-align: center;
         padding: 12px 0; /* Easier to tap */
     }
-
     /* 6. Panic Button - Mobile Adjustment */
     .panic-button {
         /* Reset any bottom/right positioning if it existed */
